@@ -28,6 +28,7 @@ class BaseDataSet(Dataset):
 
         self.label_list = list()
         self.path_list = list()
+        self.bboxes = dict()
         self._load_data()
         self.label_index_dict = self._build_label_index_dict()
 
@@ -38,14 +39,16 @@ class BaseDataSet(Dataset):
         return self.__str__()
 
     def __str__(self):
-        return f"| Dataset Info |datasize: {self.__len__()}|num_labels: {len(set(self.label_list))}|"
+        return f"| Dataset Info |datasize: {self.__len__()}|num_labels: {len(self.label_list)}| bbox: {len(self.bboxes)} |"
 
     def _load_data(self):
         with open(self.img_source, 'r') as f:
             for line in f:
-                _path, _label = re.split(r",| ", line.strip())
+                _path, _label, *_rest = re.split(r",| ", line.strip())
                 self.path_list.append(_path)
                 self.label_list.append(_label)
+                if len(_rest) == 4:  # Bounding box
+                    self.bboxes[_path] = [int(v) for v in _rest]
 
     def _build_label_index_dict(self):
         index_dict = defaultdict(list)
@@ -59,6 +62,9 @@ class BaseDataSet(Dataset):
         label = self.label_list[index]
 
         img = read_image(img_path, mode=self.mode)
+        if self.bboxes and self.bboxes.get(path):
+            x1, y1, x2, y2 = self.bboxes[path]
+            img = img.crop((x1, y1, x2, y2))
         if self.transforms is not None:
             img = self.transforms(img)
         return img, label
